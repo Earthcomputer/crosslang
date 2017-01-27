@@ -1,0 +1,4 @@
+.cproject
+*.o
+.project
+.settings/

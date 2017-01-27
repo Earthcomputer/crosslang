@@ -1,0 +1,39 @@
+field std::list<int> foo = 1 + 2 - 3 + 4
+
+/*
+ * A multiline comment
+ */
+ # A hashtag comment
+function int main() {
+	for(;){}
+	print('Hello World!');
+	for (int i = 0; i < 10; i++) {
+		print(i)
+	}
+	if some_condition do_something()
+	if (bar) then baz() else shizzle()
+	
+	repeat(5)
+		print(1 + 1)
+	
+	while true tick()
+	do tick() while some_namespace::some_other_namespace::running
+	
+	std::list foo = (std::list<bar>) baz;
+	
+	forever {
+		print("Haha, you're stuck in this loop forever!")
+	}
+	
+	return 0
+}
+
+fn void doStuff(int withThis, long andThat) {}
+
+// Unnamed module
+module {
+	field global double PI = 3.141592654;
+}
+module aNamespace {
+	field int inside_block
+}
