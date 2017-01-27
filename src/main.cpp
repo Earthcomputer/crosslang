@@ -26,15 +26,15 @@ int get_line_number(std::vector<int> line_numbers, int pos) {
 	return size;
 }
 
-void print_field_index(field_index* idx) {
+void print_field_index(indexer::field_index* idx) {
 	std::cout << "Field: " << idx->get_type().to_string() << " "
 			<< idx->get_name() << std::endl;
 }
 
-void print_function_index(function_index* idx) {
+void print_function_index(indexer::function_index* idx) {
 	std::string params = "(";
 	bool first = true;
-	for (type_ref& type : *(idx->get_parameter_types())) {
+	for (ast::type_ref& type : *(idx->get_parameter_types())) {
 		if (!first) {
 			params += ", ";
 		}
@@ -46,7 +46,7 @@ void print_function_index(function_index* idx) {
 			<< idx->get_name() << " " << params << std::endl;
 }
 
-void print_module_index(module_index* idx) {
+void print_module_index(indexer::module_index* idx) {
 	std::string str = "Module";
 	if (idx->has_name()) {
 		str += " " + idx->get_name();
@@ -54,13 +54,13 @@ void print_module_index(module_index* idx) {
 	str += ":";
 	std::cout << str << std::endl;
 	std::cout << "{" << std::endl;
-	for (module_index* submodule : *(idx->get_modules())) {
+	for (indexer::module_index* submodule : *(idx->get_modules())) {
 		print_module_index(submodule);
 	}
-	for (field_index* subfield : *(idx->get_fields())) {
+	for (indexer::field_index* subfield : *(idx->get_fields())) {
 		print_field_index(subfield);
 	}
-	for (function_index* subfunction : *(idx->get_functions())) {
+	for (indexer::function_index* subfunction : *(idx->get_functions())) {
 		print_function_index(subfunction);
 	}
 	std::cout << "}" << std::endl;
@@ -82,19 +82,19 @@ int main() {
 	std::ifstream in;
 	in.open("test.txt");
 
-	std::string text = read_input_stream(in);
+	std::string text = tokenizer::read_input_stream(in);
 	in.close();
 
-	std::vector<token> tokens;
+	std::vector<tokenizer::token> tokens;
 	std::vector<int> line_numbers;
 	try {
-		tokenize(text, tokens, line_numbers);
+		tokenizer::tokenize(text, tokens, line_numbers);
 
-		std::vector<ast_node*>* nodes = parse(tokens);
+		std::vector<ast::ast_node*>* nodes = parser::parse(tokens);
 
-		index* idx = index_ast_tree(nodes);
+		indexer::index* idx = indexer::index_ast_tree(nodes);
 		print_module_index(idx);
-	} catch (tokenizer_exception& e) {
+	} catch (tokenizer::tokenizer_exception& e) {
 		std::cerr << "COMPILATION FAILED WHILE TOKENIZING!" << std::endl;
 		std::cerr
 				<< "This means the compiler failed to split the file up into tokens (words)."
@@ -103,7 +103,7 @@ int main() {
 				<< std::endl;
 		std::cerr << "Message: " << e.what() << std::endl;
 		print_random_witty_comment();
-	} catch (parser_exception& e) {
+	} catch (parser::parser_exception& e) {
 		std::cerr << "COMPILATION FAILED WHILE PARSING!" << std::endl;
 		std::cerr
 				<< "This means the compiler was unable to deduce the structure of the code."
@@ -113,7 +113,7 @@ int main() {
 		std::cerr << "Line number: "
 				<< get_line_number(line_numbers, e.get_pos()) << std::endl;
 		print_random_witty_comment();
-	} catch (indexer_exception& e) {
+	} catch (indexer::indexer_exception& e) {
 		std::cerr << "COMPILATION FAILED WHILE INDEXING!" << std::endl;
 		std::cerr
 				<< "This occurs when the compiler is trying to build an index (dictionary) of fields, functions, etc."

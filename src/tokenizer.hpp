@@ -8,6 +8,8 @@
 #include <string>
 #include <vector>
 
+namespace tokenizer {
+
 class tokenizer_exception: public std::exception {
 	const char* description;
 	int pos;
@@ -37,5 +39,7 @@ void tokenize(std::string in, std::vector<token>& tokens,
 		std::vector<int>& line_breaks);
 
 std::string read_input_stream(std::istream& in);
+
+}
 
 #endif

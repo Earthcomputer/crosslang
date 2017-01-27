@@ -11,25 +11,25 @@
 #include "tokenizer.hpp"
 #include "parser.hpp"
 
-parser_exception::parser_exception(const char* desc, int pos) :
+parser::parser_exception::parser_exception(const char* desc, int pos) :
 		pos(pos), desc(desc) {
 }
-parser_exception::~parser_exception() {
+parser::parser_exception::~parser_exception() {
 	delete desc;
 }
-const char* parser_exception::what() {
+const char* parser::parser_exception::what() {
 	return desc;
 }
-int parser_exception::get_pos() {
+int parser::parser_exception::get_pos() {
 	return pos;
 }
 
-std::map<std::string, modifier> create_modifiers() {
-	std::map<std::string, modifier> modifiers;
-	modifiers["global"] = modifier::GLOBAL;
+std::map<std::string, ast::modifier> create_modifiers() {
+	std::map<std::string, ast::modifier> modifiers;
+	modifiers["global"] = ast::modifier::GLOBAL;
 	return modifiers;
 }
-std::map<std::string, modifier> modifiers = create_modifiers();
+std::map<std::string, ast::modifier> modifiers = create_modifiers();
 std::set<std::string> create_left_unary_operators() {
 	std::set<std::string> operators;
 	operators.insert("!");
@@ -89,34 +89,34 @@ std::set<std::string> create_assignment_operators() {
 }
 std::set<std::string> assignment_operators = create_assignment_operators();
 
-class parser {
-	std::vector<token>* tokens;
-	std::vector<token>::size_type next_index = 0;
-	std::vector<std::vector<token>::size_type> saved_next_indices;
+class parser_cls {
+	std::vector<tokenizer::token>* tokens;
+	std::vector<tokenizer::token>::size_type next_index = 0;
+	std::vector<std::vector<tokenizer::token>::size_type> saved_next_indices;
 public:
-	parser(std::vector<token>* tokens) :
+	parser_cls(std::vector<tokenizer::token>* tokens) :
 			tokens(tokens) {
 	}
-	~parser() {
+	~parser_cls() {
 		delete tokens;
 	}
-	std::vector<ast_node*>* consume_root() {
-		std::vector<ast_node*>* ret = consume_ast_node_list();
+	std::vector<ast::ast_node*>* consume_root() {
+		std::vector<ast::ast_node*>* ret = consume_ast_node_list();
 		consume_eof();
 		return ret;
 	}
 private:
-	std::vector<ast_node*>* consume_ast_node_list() {
-		std::vector<ast_node*>* nodes = new std::vector<ast_node*>;
-		token* t = next_token();
+	std::vector<ast::ast_node*>* consume_ast_node_list() {
+		std::vector<ast::ast_node*>* nodes = new std::vector<ast::ast_node*>;
+		tokenizer::token* t = next_token();
 		while (is_ast_node_token(t)) {
 			nodes->push_back(consume_ast_node());
 			t = next_token();
 		}
 		return nodes;
 	}
-	ast_node* consume_ast_node() {
-		token* t = next_token();
+	ast::ast_node* consume_ast_node() {
+		tokenizer::token* t = next_token();
 		if (is_module_token(t)) {
 			return consume_module_node();
 		} else if (is_field_token(t)) {
@@ -124,11 +124,11 @@ private:
 		} else if (is_function_token(t)) {
 			return consume_function_node();
 		} else {
-			throw parser_exception("Unexpected token", token_pos(t));
+			throw parser::parser_exception("Unexpected token", token_pos(t));
 		}
 	}
-	module_node* consume_module_node() {
-		token* t;
+	ast::module_node* consume_module_node() {
+		tokenizer::token* t;
 		consume_token(is_module_token);
 		t = next_token();
 		std::string namespace_name;
@@ -138,40 +138,42 @@ private:
 			namespace_name = "";
 		}
 		consume_token(is_open_brace);
-		std::vector<ast_node*>* children = consume_ast_node_list();
+		std::vector<ast::ast_node*>* children = consume_ast_node_list();
 		consume_token(is_close_brace);
-		return new module_node(namespace_name, children);
+		return new ast::module_node(namespace_name, children);
 	}
-	field_node* consume_field_node() {
+	ast::field_node* consume_field_node() {
 		consume_token(is_field_token);
-		std::set<modifier>* modifiers = consume_modifier_list();
-		type_ref type = consume_type_ref();
+		std::set<ast::modifier>* modifiers = consume_modifier_list();
+		ast::type_ref type = consume_type_ref();
 		std::string name = consume_token(is_identifier)->text;
-		expression* initialization_expression = nullptr;
-		token* t = next_token();
+		ast::expression* initialization_expression = nullptr;
+		tokenizer::token* t = next_token();
 		if (is_equals(t)) {
 			consume_token(is_equals);
 			initialization_expression = consume_expression();
 		}
 		consume_end_statement();
-		return new field_node(modifiers, type, name, initialization_expression);
+		return new ast::field_node(modifiers, type, name,
+				initialization_expression);
 	}
-	function_node* consume_function_node() {
+	ast::function_node* consume_function_node() {
 		consume_token(is_function_token);
-		std::set<modifier>* modifiers = consume_modifier_list();
-		type_ref type = consume_type_ref();
+		std::set<ast::modifier>* modifiers = consume_modifier_list();
+		ast::type_ref type = consume_type_ref();
 		std::string name = consume_token(is_identifier)->text;
 		consume_token(is_open_parenthesis);
-		std::vector<field_node*>* parameters = new std::vector<field_node*>;
-		token* t = next_token();
+		std::vector<ast::field_node*>* parameters = new std::vector<
+				ast::field_node*>;
+		tokenizer::token* t = next_token();
 		while (!is_close_parenthesis(t)) {
 			if (!parameters->empty()) {
 				consume_token(is_comma);
 			}
-			std::set<modifier>* modifiers = consume_modifier_list();
-			type_ref type = consume_type_ref();
+			std::set<ast::modifier>* modifiers = consume_modifier_list();
+			ast::type_ref type = consume_type_ref();
 			std::string name = consume_token(is_identifier)->text;
-			expression* initialization_expression = nullptr;
+			ast::expression* initialization_expression = nullptr;
 			t = next_token();
 			if (is_equals(t)) {
 				consume_token(is_equals);
@@ -179,16 +181,16 @@ private:
 				t = next_token();
 			}
 			parameters->push_back(
-					new field_node(modifiers, type, name,
+					new ast::field_node(modifiers, type, name,
 							initialization_expression));
 		}
 		consume_token(is_close_parenthesis);
-		statement* body = consume_statement(false);
-		return new function_node(modifiers, type, name, parameters, body);
+		ast::statement* body = consume_statement(false);
+		return new ast::function_node(modifiers, type, name, parameters, body);
 	}
-	std::set<modifier>* consume_modifier_list() {
-		std::set<modifier>* modifier_list = new std::set<modifier>;
-		token* t = next_token();
+	std::set<ast::modifier>* consume_modifier_list() {
+		std::set<ast::modifier>* modifier_list = new std::set<ast::modifier>;
+		tokenizer::token* t = next_token();
 		while (is_modifier(t)) {
 			consume_token(is_modifier);
 			modifier_list->insert(modifiers[t->text]);
@@ -196,11 +198,12 @@ private:
 		}
 		return modifier_list;
 	}
-	type_ref consume_type_ref() {
+	ast::type_ref consume_type_ref() {
 		std::vector<std::string>* namespaces = new std::vector<std::string>;
 		std::string type_name = consume_token(is_identifier)->text;
-		std::vector<type_ref>* generic_args = new std::vector<type_ref>;
-		token* t = next_token();
+		std::vector<ast::type_ref>* generic_args =
+				new std::vector<ast::type_ref>;
+		tokenizer::token* t = next_token();
 		while (is_namespace_operator(t)) {
 			consume_token(is_namespace_operator);
 			namespaces->push_back(type_name);
@@ -219,10 +222,10 @@ private:
 			}
 			consume_token(is_close_angled_bracket);
 		}
-		return type_ref(namespaces, type_name, generic_args);
+		return ast::type_ref(namespaces, type_name, generic_args);
 	}
-	expression* consume_expression() {
-		token* t = next_token();
+	ast::expression* consume_expression() {
+		tokenizer::token* t = next_token();
 		int initial_pos = t->pos;
 		if (is_operator(t)) {
 			if (is_open_parenthesis(t)) {
@@ -236,12 +239,12 @@ private:
 				try {
 					// first try parsing it as a type ref (for a cast). If we're wrong,
 					// we convert later
-					type_ref type = consume_type_ref();
+					ast::type_ref type = consume_type_ref();
 					consume_token(is_close_parenthesis);
 					enclosed = &type;
 					is_enclosed_type_ref = true;
 					discard_saved_state();
-				} catch (parser_exception& e) {
+				} catch (parser::parser_exception& e) {
 					// otherwise consume it as an expression
 					revert_saved_state();
 					enclosed = consume_expression();
@@ -258,46 +261,48 @@ private:
 				if (((is_left_unary_operator(t) && t->text != "+"
 						&& t->text != "-") || is_open_parenthesis(t)
 						|| is_identifier(t)) && is_enclosed_type_ref) {
-					type_ref type = *static_cast<type_ref*>(enclosed);
-					return new cast_expression(type, consume_expression());
+					ast::type_ref type = *static_cast<ast::type_ref*>(enclosed);
+					return new ast::cast_expression(type, consume_expression());
 				} else {
 					// we have a parenthesized expression
-					expression* enclosed_expr;
+					ast::expression* enclosed_expr;
 					if (is_enclosed_type_ref) {
 						// if the enclosed was interpreted as a type ref, we
 						// need to convert it
-						type_ref type = *static_cast<type_ref*>(enclosed);
+						ast::type_ref type =
+								*static_cast<ast::type_ref*>(enclosed);
 						if (!type.get_generic_args()->empty()) {
-							throw parser_exception(
+							throw parser::parser_exception(
 									"Unexpected type reference in parenthesized expression",
 									initial_pos);
 						}
-						enclosed_expr = new identifier_expression(
+						enclosed_expr = new ast::identifier_expression(
 								type.get_type_name());
 						std::vector<std::string>* namespaces =
 								type.get_namespaces();
 						for (std::vector<std::string>::reverse_iterator it =
 								namespaces->rbegin(); it != namespaces->rend();
 								++it) {
-							enclosed_expr = new namespace_expression(*it,
+							enclosed_expr = new ast::namespace_expression(*it,
 									enclosed_expr);
 						}
 					} else {
-						enclosed_expr = static_cast<expression*>(enclosed);
+						enclosed_expr = static_cast<ast::expression*>(enclosed);
 					}
-					parenthesized_expression* expr =
-							new parenthesized_expression(enclosed_expr);
+					ast::parenthesized_expression* expr =
+							new ast::parenthesized_expression(enclosed_expr);
 					// check for binary operators and right unary operators after
 					// the parenthesized expression
 					if (is_middle_binary_operator(t)) {
 						std::string operator_name = consume_token(
 								is_middle_binary_operator)->text;
-						expression* rhs = consume_expression();
-						return new operator_expression(expr, operator_name, rhs);
+						ast::expression* rhs = consume_expression();
+						return new ast::operator_expression(expr, operator_name,
+								rhs);
 					} else if (is_right_unary_operator(t)) {
 						std::string operator_name = consume_token(
 								is_right_unary_operator)->text;
-						return new unary_operator_right_expression(expr,
+						return new ast::unary_operator_right_expression(expr,
 								operator_name);
 					} else {
 						return expr;
@@ -307,8 +312,8 @@ private:
 				// the expression may instead start with a left unary operator
 				std::string operator_name = consume_token(
 						is_left_unary_operator)->text;
-				expression* operand = consume_expression();
-				return new unary_operator_left_expression(operator_name,
+				ast::expression* operand = consume_expression();
+				return new ast::unary_operator_left_expression(operator_name,
 						operand);
 			}
 		} else if (is_number(t)) {
@@ -317,45 +322,45 @@ private:
 			consume_token(is_number);
 			// obtain a copy of the token's text for us to work on
 			std::string text(t->text.c_str());
-			radix rad;
-			expression* number_expr;
+			ast::radix rad;
+			ast::expression* number_expr;
 			if (text.find("0x") == 0 || text.find("0X") == 0) {
-				rad = radix::HEX;
+				rad = ast::radix::HEX;
 				text.erase(0, 2);
 			} else if (text.find("0b") == 0 || text.find("0B") == 0) {
-				rad = radix::BINARY;
+				rad = ast::radix::BINARY;
 				text.erase(0, 2);
 			} else if (text.find('0') == 0) {
 				if (text != "0") {
-					rad = radix::OCTAL;
+					rad = ast::radix::OCTAL;
 					text.erase(0, 1);
 				} else {
-					rad = radix::DECIMAL;
+					rad = ast::radix::DECIMAL;
 				}
 			} else {
-				rad = radix::DECIMAL;
+				rad = ast::radix::DECIMAL;
 			}
 
 			if (text.empty()) {
-				throw parser_exception("Invalid number", t->pos);
+				throw parser::parser_exception("Invalid number", t->pos);
 			}
 			// integers don't contain a decimal point or exponent
 			if (text.find(".") == std::string::npos
-					&& (rad == radix::HEX
+					&& (rad == ast::radix::HEX
 							|| (text.find("e") == std::string::npos
 									&& text.find("E") == std::string::npos))) {
 				int base;
 				switch (rad) {
-				case radix::BINARY:
+				case ast::radix::BINARY:
 					base = 2;
 					break;
-				case radix::OCTAL:
+				case ast::radix::OCTAL:
 					base = 8;
 					break;
-				case radix::DECIMAL:
+				case ast::radix::DECIMAL:
 					base = 10;
 					break;
-				case radix::HEX:
+				case ast::radix::HEX:
 					base = 16;
 					break;
 				}
@@ -364,13 +369,13 @@ private:
 				char* end_ptr;
 				int value = std::strtol(text.c_str(), &end_ptr, base);
 				if ((*end_ptr) != '\0') {
-					throw parser_exception("Invalid number", t->pos);
+					throw parser::parser_exception("Invalid number", t->pos);
 				}
-				number_expr = new const_integer_expression(value, rad);
+				number_expr = new ast::const_integer_expression(value, rad);
 			} else {
 				// only decimal numbers are allowed for non-integral types
-				if (rad != radix::DECIMAL) {
-					throw parser_exception(
+				if (rad != ast::radix::DECIMAL) {
+					throw parser::parser_exception(
 							"Not allowed non-integer values for non-decimal numbers",
 							t->pos);
 				}
@@ -379,32 +384,33 @@ private:
 				char* end_ptr;
 				double value = std::strtod(text.c_str(), &end_ptr);
 				if ((*end_ptr) != '\0') {
-					throw parser_exception("Invalid number", t->pos);
+					throw parser::parser_exception("Invalid number", t->pos);
 				}
-				number_expr = new const_double_expression(value);
+				number_expr = new ast::const_double_expression(value);
 			}
 			// check for binary operators
 			t = next_token();
 			if (is_middle_binary_operator(t)) {
 				std::string operator_name = consume_token(
 						is_middle_binary_operator)->text;
-				expression* rhs = consume_expression();
-				return new operator_expression(number_expr, operator_name, rhs);
+				ast::expression* rhs = consume_expression();
+				return new ast::operator_expression(number_expr, operator_name,
+						rhs);
 			}
 			return number_expr;
 		} else if (is_identifier(t)) {
 			// if it starts with an identifier, it might be a namespace
 			// operator, which would require a recursive function to
 			// consume the tokens, so ya, here it is
-			expression* expr = consume_expression_identifier_part();
+			ast::expression* expr = consume_expression_identifier_part();
 			t = next_token();
 			// check for binary operators, which would not be allowed as part
 			// of a namespace expression
 			if (is_middle_binary_operator(t)) {
 				std::string operator_name = consume_token(
 						is_middle_binary_operator)->text;
-				expression* rhs = consume_expression();
-				expr = new operator_expression(expr, operator_name, rhs);
+				ast::expression* rhs = consume_expression();
+				expr = new ast::operator_expression(expr, operator_name, rhs);
 			}
 			return expr;
 		} else if (is_single_quoted_string(t) || is_double_quoted_string(t)) {
@@ -412,31 +418,31 @@ private:
 			consume_token();
 			std::string text = t->text;
 			text = text.substr(1, text.length() - 2);
-			expression* expr = new const_string_expression(text);
+			ast::expression* expr = new ast::const_string_expression(text);
 			// check for binary operators, e.g. concatenation
 			t = next_token();
 			if (is_middle_binary_operator(t)) {
 				std::string operator_name = consume_token(
 						is_middle_binary_operator)->text;
-				expression* rhs = consume_expression();
-				expr = new operator_expression(expr, operator_name, rhs);
+				ast::expression* rhs = consume_expression();
+				expr = new ast::operator_expression(expr, operator_name, rhs);
 			}
 			return expr;
 		}
-		throw parser_exception("Unexpected token - expected expression",
+		throw parser::parser_exception("Unexpected token - expected expression",
 				initial_pos);
 	}
-	expression* consume_expression_identifier_part() {
+	ast::expression* consume_expression_identifier_part() {
 		std::string text = consume_token(is_identifier)->text;
-		expression* expr;
+		ast::expression* expr;
 		// see what's after the identifier
-		token* t = next_token();
+		tokenizer::token* t = next_token();
 		if (is_operator(t)) {
 			if (is_open_parenthesis(t)) {
 				// if it's a ( then it's a call expression
 				consume_token(is_open_parenthesis);
-				std::vector<expression*>* operands =
-						new std::vector<expression*>;
+				std::vector<ast::expression*>* operands = new std::vector<
+						ast::expression*>;
 				t = next_token();
 				while (!is_close_parenthesis(t)) {
 					if (!operands->empty()) {
@@ -446,38 +452,39 @@ private:
 					t = next_token();
 				}
 				consume_token(is_close_parenthesis);
-				expr = new call_expression(text, operands);
+				expr = new ast::call_expression(text, operands);
 			} else if (is_namespace_operator(t)) {
 				// if it's a :: then it's a namespace expression
 				consume_token(is_namespace_operator);
-				expression* operand = consume_expression_identifier_part();
-				expr = new namespace_expression(text, operand);
+				ast::expression* operand = consume_expression_identifier_part();
+				expr = new ast::namespace_expression(text, operand);
 			} else {
 				// otherwise it's just a plain identifier expression
-				expr = new identifier_expression(text);
+				expr = new ast::identifier_expression(text);
 			}
 		} else {
 			// otherwise it's just a plain identifier expression
-			expr = new identifier_expression(text);
+			expr = new ast::identifier_expression(text);
 		}
-		if (expr->is_of_expression_kind(expression_kind::IDENTIFIER)) {
+		if (expr->is_of_expression_kind(ast::expression_kind::IDENTIFIER)) {
 			// if the "identifier expression" is true or false, then it may
 			// instead be a boolean expression
-			identifier_expression* id =
-					static_cast<identifier_expression*>(expr);
+			ast::identifier_expression* id =
+					static_cast<ast::identifier_expression*>(expr);
 			if (id->get_identifier() == "true") {
 				delete expr;
-				expr = new const_boolean_expression(true);
+				expr = new ast::const_boolean_expression(true);
 			} else if (id->get_identifier() == "false") {
 				delete expr;
-				expr = new const_boolean_expression(false);
+				expr = new ast::const_boolean_expression(false);
 			}
 		}
 		// check for array access expressions
 		t = next_token();
 		while (is_open_square_bracket(t)) {
 			consume_token(is_open_square_bracket);
-			std::vector<expression*>* indices = new std::vector<expression*>;
+			std::vector<ast::expression*>* indices = new std::vector<
+					ast::expression*>;
 			t = next_token();
 			while (!is_close_square_bracket(t)) {
 				if (!indices->empty()) {
@@ -487,30 +494,32 @@ private:
 				t = next_token();
 			}
 			consume_token(is_close_square_bracket);
-			expr = new array_expression(expr, indices);
+			expr = new ast::array_expression(expr, indices);
 			t = next_token();
 		}
 		// check for right unary operators
 		if (is_right_unary_operator(t)) {
 			std::string operator_name =
 					consume_token(is_right_unary_operator)->text;
-			expr = new unary_operator_right_expression(expr, operator_name);
+			expr = new ast::unary_operator_right_expression(expr,
+					operator_name);
 		}
 		return expr;
 	}
-	std::vector<statement*>* consume_statement_list(
-			bool (*end_condition)(token*)) {
-		std::vector<statement*>* statements = new std::vector<statement*>;
-		token* t = next_token();
+	std::vector<ast::statement*>* consume_statement_list(
+			bool (*end_condition)(tokenizer::token*)) {
+		std::vector<ast::statement*>* statements = new std::vector<
+				ast::statement*>;
+		tokenizer::token* t = next_token();
 		while (!end_condition(t)) {
 			statements->push_back(consume_statement(true));
 			t = next_token();
 		}
 		return statements;
 	}
-	statement* consume_statement(bool allow_semicolon) {
-		token* t = next_token();
-		statement* stmt;
+	ast::statement* consume_statement(bool allow_semicolon) {
+		tokenizer::token* t = next_token();
+		ast::statement* stmt;
 		if (is_open_brace(t)) {
 			stmt = consume_block_statement();
 		} else if (is_if_token(t)) {
@@ -532,15 +541,15 @@ private:
 			try {
 				stmt = consume_variable_declaration_statement();
 				discard_saved_state();
-			} catch (parser_exception& e) {
+			} catch (parser::parser_exception& e) {
 				revert_saved_state();
 				push_saved_state();
 				try {
 					stmt = consume_assignment_statement();
 					discard_saved_state();
-				} catch (parser_exception& e) {
+				} catch (parser::parser_exception& e) {
 					revert_saved_state();
-					stmt = new expression_statement(consume_expression());
+					stmt = new ast::expression_statement(consume_expression());
 				}
 			}
 		}
@@ -549,40 +558,40 @@ private:
 		}
 		return stmt;
 	}
-	block_statement* consume_block_statement() {
+	ast::block_statement* consume_block_statement() {
 		consume_token(is_open_brace);
-		std::vector<statement*>* children = consume_statement_list(
+		std::vector<ast::statement*>* children = consume_statement_list(
 				is_close_brace);
 		consume_token(is_close_brace);
-		return new block_statement(children);
+		return new ast::block_statement(children);
 	}
-	variable_declaration_statement* consume_variable_declaration_statement() {
-		std::set<modifier>* modifiers = consume_modifier_list();
-		type_ref type = consume_type_ref();
+	ast::variable_declaration_statement* consume_variable_declaration_statement() {
+		std::set<ast::modifier> *modifiers = consume_modifier_list();
+		ast::type_ref type = consume_type_ref();
 		std::string name = consume_token(is_identifier)->text;
-		expression* initialization_expression = nullptr;
-		token* t = next_token();
+		ast::expression* initialization_expression = nullptr;
+		tokenizer::token* t = next_token();
 		if (is_equals(t)) {
 			consume_token(is_equals);
 			initialization_expression = consume_expression();
 		}
-		return new variable_declaration_statement(modifiers, type, name,
+		return new ast::variable_declaration_statement(modifiers, type, name,
 				initialization_expression);
 	}
-	assignment_statement* consume_assignment_statement() {
-		expression* lhs = consume_expression();
+	ast::assignment_statement* consume_assignment_statement() {
+		ast::expression* lhs = consume_expression();
 		std::string operator_name = consume_token(is_assignment_operator)->text;
-		expression* rhs = consume_expression();
-		return new assignment_statement(lhs, operator_name, rhs);
+		ast::expression* rhs = consume_expression();
+		return new ast::assignment_statement(lhs, operator_name, rhs);
 	}
-	if_statement* consume_if_statement() {
+	ast::if_statement* consume_if_statement() {
 		consume_token(is_if_token);
-		token* t = next_token();
+		tokenizer::token* t = next_token();
 		bool condition_in_parentheses = is_open_parenthesis(t);
 		if (condition_in_parentheses) {
 			consume_token(is_open_parenthesis);
 		}
-		expression* condition = consume_expression();
+		ast::expression* condition = consume_expression();
 		if (condition_in_parentheses) {
 			consume_token(is_close_parenthesis);
 		}
@@ -590,50 +599,50 @@ private:
 		if (is_then_token(t)) {
 			consume_token(is_then_token);
 		}
-		statement* if_clause = consume_statement(false);
-		statement* else_clause = nullptr;
+		ast::statement* if_clause = consume_statement(false);
+		ast::statement* else_clause = nullptr;
 		t = next_token();
 		if (is_else_token(t)) {
 			consume_token(is_else_token);
 			else_clause = consume_statement(false);
 		}
-		return new if_statement(condition, if_clause, else_clause);
+		return new ast::if_statement(condition, if_clause, else_clause);
 	}
-	while_statement* consume_while_statement() {
+	ast::while_statement* consume_while_statement() {
 		consume_token(is_while_token);
-		token* t = next_token();
+		tokenizer::token* t = next_token();
 		bool condition_in_parentheses = is_open_parenthesis(t);
 		if (condition_in_parentheses) {
 			consume_token(is_open_parenthesis);
 		}
-		expression* condition = consume_expression();
+		ast::expression* condition = consume_expression();
 		if (condition_in_parentheses) {
 			consume_token(is_close_parenthesis);
 		}
-		statement* while_clause = consume_statement(false);
-		return new while_statement(condition, while_clause);
+		ast::statement* while_clause = consume_statement(false);
+		return new ast::while_statement(condition, while_clause);
 	}
-	do_while_statement* consume_do_while_statement() {
+	ast::do_while_statement* consume_do_while_statement() {
 		consume_token(is_do_token);
-		statement* do_while_clause = consume_statement(false);
+		ast::statement* do_while_clause = consume_statement(false);
 		consume_token(is_while_token);
-		token* t = next_token();
+		tokenizer::token* t = next_token();
 		bool condition_in_parentheses = is_open_parenthesis(t);
 		if (condition_in_parentheses) {
 			consume_token(is_open_parenthesis);
 		}
-		expression* condition = consume_expression();
+		ast::expression* condition = consume_expression();
 		if (condition_in_parentheses) {
 			consume_token(is_close_parenthesis);
 		}
-		return new do_while_statement(do_while_clause, condition);
+		return new ast::do_while_statement(do_while_clause, condition);
 	}
-	for_statement* consume_for_statement() {
+	ast::for_statement* consume_for_statement() {
 		consume_token(is_for_token);
 		consume_token(is_open_parenthesis);
 
-		token* t = next_token();
-		statement* initializer;
+		tokenizer::token* t = next_token();
+		ast::statement* initializer;
 		if (is_semicolon(t)) {
 			initializer = nullptr;
 		} else {
@@ -642,7 +651,7 @@ private:
 		consume_token(is_semicolon);
 
 		t = next_token();
-		expression* condition;
+		ast::expression* condition;
 		if (is_semicolon(t)) {
 			condition = nullptr;
 		} else {
@@ -651,7 +660,7 @@ private:
 		consume_token(is_semicolon);
 
 		t = next_token();
-		statement* increment;
+		ast::statement* increment;
 		if (is_close_parenthesis(t)) {
 			increment = nullptr;
 		} else {
@@ -659,32 +668,33 @@ private:
 		}
 		consume_token(is_close_parenthesis);
 
-		statement* for_clause = consume_statement(false);
-		return new for_statement(initializer, condition, increment, for_clause);
+		ast::statement* for_clause = consume_statement(false);
+		return new ast::for_statement(initializer, condition, increment,
+				for_clause);
 	}
-	forever_statement* consume_forever_statement() {
+	ast::forever_statement* consume_forever_statement() {
 		consume_token(is_forever_token);
-		statement* forever_clause = consume_statement(false);
-		return new forever_statement(forever_clause);
+		ast::statement* forever_clause = consume_statement(false);
+		return new ast::forever_statement(forever_clause);
 	}
-	repeat_statement* consume_repeat_statement() {
+	ast::repeat_statement* consume_repeat_statement() {
 		consume_token(is_repeat_token);
-		token* t = next_token();
+		tokenizer::token* t = next_token();
 		bool times_in_parentheses = is_open_parenthesis(t);
 		if (times_in_parentheses) {
 			consume_token(is_open_parenthesis);
 		}
-		expression* times = consume_expression();
+		ast::expression* times = consume_expression();
 		if (times_in_parentheses) {
 			consume_token(is_close_parenthesis);
 		}
-		statement* repeat_clause = consume_statement(false);
-		return new repeat_statement(times, repeat_clause);
+		ast::statement* repeat_clause = consume_statement(false);
+		return new ast::repeat_statement(times, repeat_clause);
 	}
-	return_statement* consume_return_statement() {
+	ast::return_statement* consume_return_statement() {
 		consume_token(is_return_token);
-		expression* operand = consume_expression();
-		return new return_statement(operand);
+		ast::expression* operand = consume_expression();
+		return new ast::return_statement(operand);
 	}
 	void consume_end_statement() {
 		if (is_semicolon(next_token())) {
@@ -692,143 +702,145 @@ private:
 		}
 	}
 
-	static bool is_identifier(token* t) {
-		return t != nullptr && t->kind == token_kind::IDENTIFIER;
+	static bool is_identifier(tokenizer::token* t) {
+		return t != nullptr && t->kind == tokenizer::token_kind::IDENTIFIER;
 	}
-	static bool is_number(token* t) {
-		return t != nullptr && t->kind == token_kind::NUMBER;
+	static bool is_number(tokenizer::token* t) {
+		return t != nullptr && t->kind == tokenizer::token_kind::NUMBER;
 	}
-	static bool is_operator(token* t) {
-		return t != nullptr && t->kind == token_kind::OPERATOR;
+	static bool is_operator(tokenizer::token* t) {
+		return t != nullptr && t->kind == tokenizer::token_kind::OPERATOR;
 	}
-	static bool is_single_quoted_string(token* t) {
-		return t != nullptr && t->kind == token_kind::SINGLE_QUOTED_STRING;
+	static bool is_single_quoted_string(tokenizer::token* t) {
+		return t != nullptr
+				&& t->kind == tokenizer::token_kind::SINGLE_QUOTED_STRING;
 	}
-	static bool is_double_quoted_string(token* t) {
-		return t != nullptr && t->kind == token_kind::DOUBLE_QUOTED_STRING;
+	static bool is_double_quoted_string(tokenizer::token* t) {
+		return t != nullptr
+				&& t->kind == tokenizer::token_kind::DOUBLE_QUOTED_STRING;
 	}
 
-	static bool is_ast_node_token(token* t) {
+	static bool is_ast_node_token(tokenizer::token* t) {
 		return is_field_token(t) || is_function_token(t) || is_module_token(t);
 	}
-	static bool is_field_token(token* t) {
+	static bool is_field_token(tokenizer::token* t) {
 		return is_identifier(t) && (t->text == "fd" || t->text == "field");
 	}
-	static bool is_function_token(token* t) {
+	static bool is_function_token(tokenizer::token* t) {
 		return is_identifier(t) && (t->text == "fn" || t->text == "function");
 	}
-	static bool is_module_token(token* t) {
+	static bool is_module_token(tokenizer::token* t) {
 		return is_identifier(t) && (t->text == "md" || t->text == "module");
 	}
-	static bool is_if_token(token* t) {
+	static bool is_if_token(tokenizer::token* t) {
 		return is_identifier(t) && t->text == "if";
 	}
-	static bool is_then_token(token* t) {
+	static bool is_then_token(tokenizer::token* t) {
 		return is_identifier(t) && t->text == "then";
 	}
-	static bool is_else_token(token* t) {
+	static bool is_else_token(tokenizer::token* t) {
 		return is_identifier(t) && t->text == "else";
 	}
-	static bool is_while_token(token* t) {
+	static bool is_while_token(tokenizer::token* t) {
 		return is_identifier(t) && t->text == "while";
 	}
-	static bool is_do_token(token* t) {
+	static bool is_do_token(tokenizer::token* t) {
 		return is_identifier(t) && t->text == "do";
 	}
-	static bool is_for_token(token* t) {
+	static bool is_for_token(tokenizer::token* t) {
 		return is_identifier(t) && t->text == "for";
 	}
-	static bool is_forever_token(token* t) {
+	static bool is_forever_token(tokenizer::token* t) {
 		return is_identifier(t) && t->text == "forever";
 	}
-	static bool is_repeat_token(token* t) {
+	static bool is_repeat_token(tokenizer::token* t) {
 		return is_identifier(t) && t->text == "repeat";
 	}
-	static bool is_return_token(token* t) {
+	static bool is_return_token(tokenizer::token* t) {
 		return is_identifier(t) && t->text == "return";
 	}
-	static bool is_modifier(token* t) {
+	static bool is_modifier(tokenizer::token* t) {
 		return is_identifier(t) && modifiers.count(t->text);
 	}
-	static bool is_open_brace(token* t) {
+	static bool is_open_brace(tokenizer::token* t) {
 		return is_operator(t) && t->text == "{";
 	}
-	static bool is_close_brace(token* t) {
+	static bool is_close_brace(tokenizer::token* t) {
 		return is_operator(t) && t->text == "}";
 	}
-	static bool is_open_parenthesis(token* t) {
+	static bool is_open_parenthesis(tokenizer::token* t) {
 		return is_operator(t) && t->text == "(";
 	}
-	static bool is_close_parenthesis(token* t) {
+	static bool is_close_parenthesis(tokenizer::token* t) {
 		return is_operator(t) && t->text == ")";
 	}
-	static bool is_open_square_bracket(token* t) {
+	static bool is_open_square_bracket(tokenizer::token* t) {
 		return is_operator(t) && t->text == "[";
 	}
-	static bool is_close_square_bracket(token* t) {
+	static bool is_close_square_bracket(tokenizer::token* t) {
 		return is_operator(t) && t->text == "]";
 	}
-	static bool is_open_angled_bracket(token* t) {
+	static bool is_open_angled_bracket(tokenizer::token* t) {
 		return is_operator(t) && t->text == "<";
 	}
-	static bool is_close_angled_bracket(token* t) {
+	static bool is_close_angled_bracket(tokenizer::token* t) {
 		return is_operator(t) && t->text == ">";
 	}
-	static bool is_equals(token* t) {
+	static bool is_equals(tokenizer::token* t) {
 		return is_operator(t) && t->text == "=";
 	}
-	static bool is_semicolon(token* t) {
+	static bool is_semicolon(tokenizer::token* t) {
 		return is_operator(t) && t->text == ";";
 	}
-	static bool is_comma(token* t) {
+	static bool is_comma(tokenizer::token* t) {
 		return is_operator(t) && t->text == ",";
 	}
-	static bool is_namespace_operator(token* t) {
+	static bool is_namespace_operator(tokenizer::token* t) {
 		return is_operator(t) && t->text == "::";
 	}
-	static bool is_left_unary_operator(token* t) {
+	static bool is_left_unary_operator(tokenizer::token* t) {
 		return is_operator(t)
 				&& left_unary_operators.find(t->text)
 						!= left_unary_operators.end();
 	}
-	static bool is_right_unary_operator(token* t) {
+	static bool is_right_unary_operator(tokenizer::token* t) {
 		return is_operator(t)
 				&& right_unary_operators.find(t->text)
 						!= right_unary_operators.end();
 	}
-	static bool is_middle_binary_operator(token* t) {
+	static bool is_middle_binary_operator(tokenizer::token* t) {
 		return is_operator(t) && operators.find(t->text) != operators.end();
 	}
-	static bool is_assignment_operator(token* t) {
+	static bool is_assignment_operator(tokenizer::token* t) {
 		return is_operator(t)
 				&& assignment_operators.find(t->text)
 						!= assignment_operators.end();
 	}
 
-	token* next_token() {
+	tokenizer::token* next_token() {
 		if (next_index >= tokens->size()) {
 			return nullptr;
 		} else {
 			return &((*tokens)[next_index]);
 		}
 	}
-	token_kind next_token_kind() {
-		token* token = next_token();
+	tokenizer::token_kind next_token_kind() {
+		tokenizer::token* token = next_token();
 		if (token == nullptr) {
-			return token_kind::END_OF_FILE;
+			return tokenizer::token_kind::END_OF_FILE;
 		} else {
 			return token->kind;
 		}
 	}
-	token* consume_token() {
-		token* ret = next_token();
+	tokenizer::token* consume_token() {
+		tokenizer::token* ret = next_token();
 		next_index++;
 		return ret;
 	}
-	token* consume_token(bool (*filter)(token*)) {
-		token* t = consume_token();
+	tokenizer::token* consume_token(bool (*filter)(tokenizer::token*)) {
+		tokenizer::token* t = consume_token();
 		if (t == nullptr || !filter(t)) {
-			throw parser_exception("Unexpected token", token_pos(t));
+			throw parser::parser_exception("Unexpected token", token_pos(t));
 		}
 		return t;
 	}
@@ -850,12 +862,12 @@ private:
 		saved_next_indices.pop_back();
 	}
 	void consume_eof() {
-		token* t = consume_token();
+		tokenizer::token* t = consume_token();
 		if (t != nullptr) {
-			throw parser_exception("Expected end of file", t->pos);
+			throw parser::parser_exception("Expected end of file", t->pos);
 		}
 	}
-	int token_pos(token* t) {
+	int token_pos(tokenizer::token* t) {
 		return t == nullptr ? -1 : t->pos;
 	}
 };
@@ -864,47 +876,48 @@ enum class node_type {
 	AST_NODE, STATEMENT, EXPRESSION
 };
 
-class parentifier_visitor: public ast_visitor {
+class parentifier_visitor: public ast::ast_visitor {
 	std::vector<void*> parent_stack;
 	std::vector<node_type> types;
 public:
-	void visit_ast_node(ast_node* node) {
+	void visit_ast_node(ast::ast_node* node) {
 		if (!parent_stack.empty()) {
-			node->set_parent_node(static_cast<ast_node*>(parent_stack.back()));
+			node->set_parent_node(
+					static_cast<ast::ast_node*>(parent_stack.back()));
 		}
 		parent_stack.push_back(node);
 		types.push_back(node_type::AST_NODE);
-		ast_visitor::visit_ast_node(node);
+		ast::ast_visitor::visit_ast_node(node);
 		parent_stack.pop_back();
 		types.pop_back();
 	}
-	void visit_statement(statement* stmt) {
+	void visit_statement(ast::statement* stmt) {
 		void* parent = parent_stack.back();
 		node_type type = types.back();
 		if (type == node_type::STATEMENT) {
-			stmt->set_parent_statement(static_cast<statement*>(parent));
+			stmt->set_parent_statement(static_cast<ast::statement*>(parent));
 		} else {
-			stmt->set_parent_node(static_cast<ast_node*>(parent));
+			stmt->set_parent_node(static_cast<ast::ast_node*>(parent));
 		}
 		parent_stack.push_back(stmt);
 		types.push_back(node_type::STATEMENT);
-		ast_visitor::visit_statement(stmt);
+		ast::ast_visitor::visit_statement(stmt);
 		parent_stack.pop_back();
 		types.pop_back();
 	}
-	void visit_expression(expression* expr) {
+	void visit_expression(ast::expression* expr) {
 		void* parent = parent_stack.back();
 		node_type type = types.back();
 		if (type == node_type::EXPRESSION) {
-			expr->set_parent_expression(static_cast<expression*>(parent));
+			expr->set_parent_expression(static_cast<ast::expression*>(parent));
 		} else if (type == node_type::STATEMENT) {
-			expr->set_parent_statement(static_cast<statement*>(parent));
+			expr->set_parent_statement(static_cast<ast::statement*>(parent));
 		} else {
-			expr->set_parent_node(static_cast<ast_node*>(parent));
+			expr->set_parent_node(static_cast<ast::ast_node*>(parent));
 		}
 		parent_stack.push_back(expr);
 		types.push_back(node_type::EXPRESSION);
-		ast_visitor::visit_expression(expr);
+		ast::ast_visitor::visit_expression(expr);
 		parent_stack.pop_back();
 		types.pop_back();
 	}
@@ -955,23 +968,24 @@ std::vector<std::set<std::string>> create_op_precedence() {
 }
 std::vector<std::set<std::string>> op_precedence = create_op_precedence();
 
-class operator_precedence_fix_visitor: public ast_visitor {
+class operator_precedence_fix_visitor: public ast::ast_visitor {
 	// by default, 1 * 2 - 3 / 4 is encoded as (1 * (2 - (3 / 4)))
 	// this is changed by this visitor into    ((1 * 2) - (3 / 4))
-	std::set<operator_expression*> already_visited;
+	std::set<ast::operator_expression*> already_visited;
 public:
-	void visit_operator_expression(operator_expression* expr) {
+	void visit_operator_expression(ast::operator_expression* expr) {
 		if (already_visited.find(expr) != already_visited.end()) {
 			return;
 		}
 		already_visited.insert(expr);
-		expression* parent = expr->get_parent_expression();
+		ast::expression* parent = expr->get_parent_expression();
 		if (parent == nullptr
-				|| !parent->is_of_expression_kind(expression_kind::OPERATOR)) {
+				|| !parent->is_of_expression_kind(
+						ast::expression_kind::OPERATOR)) {
 			return;
 		}
-		operator_expression* parent_op =
-				static_cast<operator_expression*>(parent);
+		ast::operator_expression* parent_op =
+				static_cast<ast::operator_expression*>(parent);
 
 		int this_op_precedence = 0;
 		for (std::set<std::string>& level : op_precedence) {
@@ -993,7 +1007,7 @@ public:
 			// precedence in wrong order, change it
 			parent_op->set_rhs(expr->get_lhs());
 			expr->set_lhs(parent_op);
-			std::vector<expression**>* parent_parent_children;
+			std::vector<ast::expression**>* parent_parent_children;
 			if (parent_op->get_parent_expression() != nullptr) {
 				expr->set_parent_expression(parent_op->get_parent_expression());
 				parent_parent_children =
@@ -1012,7 +1026,7 @@ public:
 				parent_op->set_parent_node(nullptr);
 			}
 			parent_op->set_parent_expression(expr);
-			for (expression**& child_ptr : *parent_parent_children) {
+			for (ast::expression**& child_ptr : *parent_parent_children) {
 				if (*child_ptr == parent_op) {
 					*child_ptr = expr;
 					break;
@@ -1022,11 +1036,11 @@ public:
 		}
 	}
 };
-
-std::vector<ast_node*>* parse(std::vector<token> tokens) {
-	parser p(&tokens);
-	std::vector<ast_node*>* nodes = p.consume_root();
-	ast_visitor* visitor = new parentifier_visitor;
+std::vector<ast::ast_node*>* parser::parse(
+		std::vector<tokenizer::token> tokens) {
+	parser_cls p(&tokens);
+	std::vector<ast::ast_node*>* nodes = p.consume_root();
+	ast::ast_visitor* visitor = new parentifier_visitor;
 	visitor->visit_all(nodes);
 	delete visitor;
 	visitor = new operator_precedence_fix_visitor;

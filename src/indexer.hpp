@@ -9,29 +9,31 @@
 #include <vector>
 #include "crosslang_ast.hpp"
 
+namespace indexer {
+
 class field_index {
 	bool global;
 	std::string name;
-	type_ref type;
+	ast::type_ref type;
 public:
-	field_index(bool global, std::string name, type_ref type);
+	field_index(bool global, std::string name, ast::type_ref type);
 	bool is_global();
 	std::string get_name();
-	type_ref get_type();
+	ast::type_ref get_type();
 };
 
 class function_index {
 	bool global;
 	std::string name;
-	type_ref return_type;
-	std::vector<type_ref>* parameters;
+	ast::type_ref return_type;
+	std::vector<ast::type_ref>* parameters;
 public:
-	function_index(bool global, std::string name, type_ref return_type,
-			std::vector<type_ref>* parameters);
+	function_index(bool global, std::string name, ast::type_ref return_type,
+			std::vector<ast::type_ref>* parameters);
 	bool is_global();
 	std::string get_name();
-	type_ref get_return_type();
-	std::vector<type_ref>* get_parameter_types();
+	ast::type_ref get_return_type();
+	std::vector<ast::type_ref>* get_parameter_types();
 };
 
 class module_index {
@@ -68,6 +70,8 @@ public:
 	const char* what();
 };
 
-index* index_ast_tree(std::vector<ast_node*>* tree);
+index* index_ast_tree(std::vector<ast::ast_node*>* tree);
+
+}
 
 #endif /* INDEXER_HPP_ */

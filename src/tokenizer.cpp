@@ -7,16 +7,16 @@
 #include <vector>
 #include "tokenizer.hpp"
 
-tokenizer_exception::tokenizer_exception(const char* what, int pos) :
+tokenizer::tokenizer_exception::tokenizer_exception(const char* what, int pos) :
 		description(what), pos(pos) {
 }
-tokenizer_exception::~tokenizer_exception() throw () {
+tokenizer::tokenizer_exception::~tokenizer_exception() throw () {
 	delete description;
 }
-const char* tokenizer_exception::what() {
+const char* tokenizer::tokenizer_exception::what() {
 	return description;
 }
-int tokenizer_exception::get_pos() {
+int tokenizer::tokenizer_exception::get_pos() {
 	return pos;
 }
 
@@ -24,14 +24,14 @@ std::string multichar_operators[] = { ">>", "<<", "+=", "-=", "*=", "/=", "%=",
 		"&=", "|=", "^=", ">>=", "<<=", "&&", "||", "^^", "==", "!=", ">=",
 		"<=", "++", "--", "->", "::" };
 
-void tokenize(std::string in, std::vector<token>& tokens,
+void tokenizer::tokenize(std::string in, std::vector<tokenizer::token>& tokens,
 		std::vector<int>& line_breaks) {
 	bool in_token = false;
 	bool in_singleline_comment = false;
 	bool in_multiline_comment = false;
 	bool is_escaped = false;
 	char last_char = -1;
-	token current_token;
+	tokenizer::token current_token;
 	int pos = 0;
 
 	for (const auto& c : in) {
@@ -65,7 +65,7 @@ void tokenize(std::string in, std::vector<token>& tokens,
 			// in this switch statement, we goto next_iteration if
 			// the token is to continue, and break if the token is to end
 			switch (current_token.kind) {
-			case token_kind::IDENTIFIER: {
+			case tokenizer::token_kind::IDENTIFIER: {
 				if ((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z')
 						|| (c >= '0' && c <= '9') || (c == '_')) {
 					current_token.text += c;
@@ -73,7 +73,7 @@ void tokenize(std::string in, std::vector<token>& tokens,
 				}
 				break;
 			}
-			case token_kind::NUMBER: {
+			case tokenizer::token_kind::NUMBER: {
 				if ((c >= '0' && c <= '9') || (c >= 'A' && c <= 'F')
 						|| (c >= 'a' && c <= 'f') || (c == '.') || (c == 'x')
 						|| (c == 'X')) {
@@ -82,7 +82,7 @@ void tokenize(std::string in, std::vector<token>& tokens,
 				}
 				break;
 			}
-			case token_kind::OPERATOR: {
+			case tokenizer::token_kind::OPERATOR: {
 				// check if a multichar operator could include this char
 				std::string potential_token_text = current_token.text + c;
 				bool could_be_multichar = false;
@@ -109,22 +109,23 @@ void tokenize(std::string in, std::vector<token>& tokens,
 						}
 					}
 					if (!could_be_multichar) {
-						throw tokenizer_exception(
+						throw tokenizer::tokenizer_exception(
 								"Unable to parse multichar operator", pos);
 					}
 				}
 				break;
 			}
-			case token_kind::SINGLE_QUOTED_STRING:
-			case token_kind::DOUBLE_QUOTED_STRING: {
+			case tokenizer::token_kind::SINGLE_QUOTED_STRING:
+			case tokenizer::token_kind::DOUBLE_QUOTED_STRING: {
 				if (c == '\\') {
 					is_escaped = !is_escaped;
 				} else {
 					bool has_ended_string = false;
-					if (((current_token.kind == token_kind::SINGLE_QUOTED_STRING
+					if (((current_token.kind
+							== tokenizer::token_kind::SINGLE_QUOTED_STRING
 							&& c == '\'')
 							|| (current_token.kind
-									== token_kind::DOUBLE_QUOTED_STRING
+									== tokenizer::token_kind::DOUBLE_QUOTED_STRING
 									&& c == '"')) && !is_escaped) {
 						has_ended_string = true;
 					}
@@ -141,8 +142,9 @@ void tokenize(std::string in, std::vector<token>& tokens,
 				}
 				goto next_iteration;
 			}
-			case token_kind::END_OF_FILE:
-				throw tokenizer_exception("A token's kind should never be EOF!",
+			case tokenizer::token_kind::END_OF_FILE:
+				throw tokenizer::tokenizer_exception(
+						"A token's kind should never be EOF!",
 						current_token.pos);
 			}
 			// do end-of-token stuff
@@ -176,23 +178,23 @@ void tokenize(std::string in, std::vector<token>& tokens,
 		// check for start of different token types
 		{
 			bool started_token = false;
-			token_kind kind;
+			tokenizer::token_kind kind;
 			if ((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'z')
 					|| (c == '_')) {
 				started_token = true;
-				kind = token_kind::IDENTIFIER;
+				kind = tokenizer::token_kind::IDENTIFIER;
 			} else if (c >= '0' && c <= '9') {
 				started_token = true;
-				kind = token_kind::NUMBER;
+				kind = tokenizer::token_kind::NUMBER;
 			} else if (c == '\'') {
 				started_token = true;
-				kind = token_kind::SINGLE_QUOTED_STRING;
+				kind = tokenizer::token_kind::SINGLE_QUOTED_STRING;
 			} else if (c == '"') {
 				started_token = true;
-				kind = token_kind::DOUBLE_QUOTED_STRING;
+				kind = tokenizer::token_kind::DOUBLE_QUOTED_STRING;
 			} else {
 				started_token = true;
-				kind = token_kind::OPERATOR;
+				kind = tokenizer::token_kind::OPERATOR;
 			}
 			if (started_token) {
 				in_token = true;
@@ -208,19 +210,20 @@ void tokenize(std::string in, std::vector<token>& tokens,
 	}
 	// check end of file stuff
 	if (in_multiline_comment) {
-		throw tokenizer_exception(
+		throw tokenizer::tokenizer_exception(
 				"Reached the end of the file before the end of a multiline comment",
 				pos);
 	}
 	if (in_token) {
-		token_kind kind = current_token.kind;
-		if (kind == token_kind::SINGLE_QUOTED_STRING
-				|| kind == token_kind::DOUBLE_QUOTED_STRING) {
-			throw tokenizer_exception(
+		tokenizer::token_kind kind = current_token.kind;
+		if (kind == tokenizer::token_kind::SINGLE_QUOTED_STRING
+				|| kind == tokenizer::token_kind::DOUBLE_QUOTED_STRING) {
+			throw tokenizer::tokenizer_exception(
 					"Reached the end of the file before the end of a string",
 					pos);
 		}
-		if (kind == token_kind::OPERATOR && current_token.text.length() != 1) {
+		if (kind == tokenizer::token_kind::OPERATOR
+				&& current_token.text.length() != 1) {
 			bool is_multichar_operator = false;
 			for (const auto& multichar_operator : multichar_operators) {
 				if (current_token.text == multichar_operator) {
@@ -229,8 +232,8 @@ void tokenize(std::string in, std::vector<token>& tokens,
 				}
 			}
 			if (!is_multichar_operator) {
-				throw tokenizer_exception("Unable to parse multichar operator",
-						pos);
+				throw tokenizer::tokenizer_exception(
+						"Unable to parse multichar operator", pos);
 			}
 		}
 		tokens.push_back(current_token);
@@ -238,7 +241,7 @@ void tokenize(std::string in, std::vector<token>& tokens,
 	}
 }
 
-std::string read_input_stream(std::istream& in) {
+std::string tokenizer::read_input_stream(std::istream& in) {
 	std::string tmp;
 	std::string ret;
 	while (std::getline(in, tmp)) {

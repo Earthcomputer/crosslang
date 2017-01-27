@@ -9,6 +9,8 @@
 #include "tokenizer.hpp"
 #include "crosslang_ast.hpp"
 
+namespace parser {
+
 class parser_exception: public std::exception {
 	int pos;
 	const char* desc;
@@ -19,6 +21,7 @@ public:
 	int get_pos();
 };
 
-std::vector<ast_node*>* parse(std::vector<token> tokens);
+std::vector<ast::ast_node*>* parse(std::vector<tokenizer::token> tokens);
 
+}
 #endif /* PARSER_HPP_ */

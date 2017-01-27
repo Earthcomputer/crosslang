@@ -9,6 +9,8 @@
 #include <set>
 #include <vector>
 
+namespace ast {
+
 enum class expression_kind {
 	IDENTIFIER,
 	PARENTHESIZED,
@@ -617,5 +619,7 @@ public:
 
 	void visit_all(std::vector<ast_node*>* nodes);
 };
+
+}
 
 #endif /* RELEASE_CROSSLANG_AST_HPP_ */
