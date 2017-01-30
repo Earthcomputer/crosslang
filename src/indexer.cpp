@@ -36,6 +36,12 @@ std::vector<ast::type_ref>* indexer::function_index::get_parameter_types() {
 	return parameters;
 }
 
+indexer::module_index::module_index() :
+		name_exists(false), name(), modules(
+				new std::set<indexer::module_index*>), fields(
+				new std::set<indexer::field_index*>), functions(
+				new std::set<indexer::function_index*>) {
+}
 indexer::module_index::module_index(std::set<indexer::module_index*>* modules,
 		std::set<indexer::field_index*>* fields,
 		std::set<indexer::function_index*>* functions) :
@@ -139,17 +145,17 @@ const char* indexer::indexer_exception::what() {
 }
 
 class indexer_visitor: public ast::ast_visitor {
-	std::vector<indexer::module_index*> module_stack = std::vector<
-			indexer::module_index*>(1,
-			new indexer::module_index(new std::set<indexer::module_index*>,
-					new std::set<indexer::field_index*>,
-					new std::set<indexer::function_index*>));
+	std::vector<indexer::module_index*> module_stack;
 public:
+	indexer_visitor(indexer::index* dictionary) :
+			module_stack(1, dictionary) {
+	}
 	void visit_field_node(ast::field_node* field) {
 		bool global = field->get_modifiers()->find(ast::modifier::GLOBAL)
 				!= field->get_modifiers()->end();
 		module_stack.back()->add_field(
-				new indexer::field_index(global, field->get_name(), field->get_type()));
+				new indexer::field_index(global, field->get_name(),
+						field->get_type()));
 	}
 	void visit_function_node(ast::function_node* func) {
 		bool global = func->get_modifiers()->find(ast::modifier::GLOBAL)
@@ -166,11 +172,15 @@ public:
 		std::string ns = module->get_namespace();
 		indexer::module_index * idx;
 		if (ns.empty()) {
-			idx = new indexer::module_index(new std::set<indexer::module_index*>,
-					new std::set<indexer::field_index*>, new std::set<indexer::function_index*>);
+			idx = new indexer::module_index(
+					new std::set<indexer::module_index*>,
+					new std::set<indexer::field_index*>,
+					new std::set<indexer::function_index*>);
 		} else {
-			idx = new indexer::module_index(ns, new std::set<indexer::module_index*>,
-					new std::set<indexer::field_index*>, new std::set<indexer::function_index*>);
+			idx = new indexer::module_index(ns,
+					new std::set<indexer::module_index*>,
+					new std::set<indexer::field_index*>,
+					new std::set<indexer::function_index*>);
 		}
 		module_stack.back()->add_module(idx);
 		module_stack.push_back(idx);
@@ -186,10 +196,9 @@ public:
 	}
 };
 
-indexer::index* indexer::index_ast_tree(std::vector<ast::ast_node*>* tree) {
-	indexer_visitor* visitor = new indexer_visitor;
+void indexer::index_ast_tree(std::vector<ast::ast_node*>* tree,
+		indexer::index* dictionary) {
+	indexer_visitor* visitor = new indexer_visitor(dictionary);
 	visitor->visit_all(tree);
-	indexer::index* ret = visitor->get_top_index();
 	delete visitor;
-	return ret;
 }

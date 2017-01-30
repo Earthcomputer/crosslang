@@ -7,11 +7,13 @@
 #include <iostream>
 #include <cstdlib>
 #include <ctime>
+#include <map>
 
 #include "tokenizer.hpp"
 #include "crosslang_ast.hpp"
 #include "parser.hpp"
 #include "indexer.hpp"
+#include "errorcodes.hpp"
 
 int get_line_number(std::vector<int> line_numbers, int pos) {
 	int size = line_numbers.size();
@@ -77,51 +79,73 @@ void print_random_witty_comment() {
 	std::cerr << comments[rand() % LENGTH] << std::endl;
 }
 
-int main() {
+int main(const int argc, char* argv[]) {
 	srand(time(NULL));
-	std::ifstream in;
-	in.open("test.txt");
 
-	std::string text = tokenizer::read_input_stream(in);
-	in.close();
-
-	std::vector<tokenizer::token> tokens;
-	std::vector<int> line_numbers;
-	try {
-		tokenizer::tokenize(text, tokens, line_numbers);
-
-		std::vector<ast::ast_node*>* nodes = parser::parse(tokens);
-
-		indexer::index* idx = indexer::index_ast_tree(nodes);
-		print_module_index(idx);
-	} catch (tokenizer::tokenizer_exception& e) {
-		std::cerr << "COMPILATION FAILED WHILE TOKENIZING!" << std::endl;
-		std::cerr
-				<< "This means the compiler failed to split the file up into tokens (words)."
-				<< std::endl;
-		std::cerr << "This is normally caused by an unclosed string/comment."
-				<< std::endl;
-		std::cerr << "Message: " << e.what() << std::endl;
-		print_random_witty_comment();
-	} catch (parser::parser_exception& e) {
-		std::cerr << "COMPILATION FAILED WHILE PARSING!" << std::endl;
-		std::cerr
-				<< "This means the compiler was unable to deduce the structure of the code."
-				<< std::endl;
-		std::cerr << "This is normally caused by a syntax error." << std::endl;
-		std::cerr << "Message: " << e.what() << std::endl;
-		std::cerr << "Line number: "
-				<< get_line_number(line_numbers, e.get_pos()) << std::endl;
-		print_random_witty_comment();
-	} catch (indexer::indexer_exception& e) {
-		std::cerr << "COMPILATION FAILED WHILE INDEXING!" << std::endl;
-		std::cerr
-				<< "This occurs when the compiler is trying to build an index (dictionary) of fields, functions, etc."
-				<< std::endl;
-		std::cerr << "Message: " << e.what() << std::endl;
-		print_random_witty_comment();
+	std::vector<std::string> args;
+	for (int i = 1; i < argc; i++) {
+		std::string str(argv[i]);
+		args.push_back(str);
 	}
 
-	return 0;
+	std::map<std::string, std::vector<ast::ast_node * > * > ast_by_filename;
+	indexer::index* dictionary = new indexer::index;
+
+	for (std::string file : args) {
+		std::ifstream in;
+		in.open(file);
+		if (!in.good()) {
+			std::cerr << "Failed to open file " << file << std::endl;
+			return ERR_FOPEN_FAILED;
+		}
+		std::string text = tokenizer::read_input_stream(in);
+		in.close();
+
+		std::vector<tokenizer::token> tokens;
+		std::vector<int> line_numbers;
+		try {
+			tokenizer::tokenize(text, tokens, line_numbers);
+
+			std::vector<ast::ast_node*>* nodes = parser::parse(tokens);
+
+			indexer::index_ast_tree(nodes, dictionary);
+		} catch (tokenizer::tokenizer_exception& e) {
+			std::cerr << "COMPILATION FAILED WHILE TOKENIZING!" << std::endl;
+			std::cerr
+					<< "This means the compiler failed to split the file up into tokens (words)."
+					<< std::endl;
+			std::cerr
+					<< "This is normally caused by an unclosed string/comment."
+					<< std::endl;
+			std::cerr << "File: " << file << std::endl;
+			std::cerr << "Message: " << e.what() << std::endl;
+			print_random_witty_comment();
+			return ERR_TOKENIZE_FAILED;
+		} catch (parser::parser_exception& e) {
+			std::cerr << "COMPILATION FAILED WHILE PARSING!" << std::endl;
+			std::cerr
+					<< "This means the compiler was unable to deduce the structure of the code."
+					<< std::endl;
+			std::cerr << "This is normally caused by a syntax error."
+					<< std::endl;
+			std::cerr << "File: " << file << std::endl;
+			std::cerr << "Message: " << e.what() << std::endl;
+			std::cerr << "Line number: "
+					<< get_line_number(line_numbers, e.get_pos()) << std::endl;
+			print_random_witty_comment();
+			return ERR_TOKENIZE_FAILED;
+		} catch (indexer::indexer_exception& e) {
+			std::cerr << "COMPILATION FAILED WHILE INDEXING!" << std::endl;
+			std::cerr
+					<< "This occurs when the compiler is trying to build an index (dictionary) of fields, functions, etc."
+					<< std::endl;
+			std::cerr << "File: " << file << std::endl;
+			std::cerr << "Message: " << e.what() << std::endl;
+			print_random_witty_comment();
+			return ERR_INDEX_FAILED;
+		}
+	}
+
+	return SUCCESS;
 }
 

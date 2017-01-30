@@ -43,6 +43,7 @@ class module_index {
 	std::set<field_index*>* fields;
 	std::set<function_index*>* functions;
 public:
+	module_index();
 	module_index(std::set<module_index*>* modules,
 			std::set<field_index*>* fields,
 			std::set<function_index*>* functions);
@@ -70,7 +71,7 @@ public:
 	const char* what();
 };
 
-index* index_ast_tree(std::vector<ast::ast_node*>* tree);
+void index_ast_tree(std::vector<ast::ast_node*>* tree, index* dictionary);
 
 }
 
