@@ -107,6 +107,7 @@ int main(const int argc, char* argv[]) {
 			tokenizer::tokenize(text, tokens, line_numbers);
 
 			std::vector<ast::ast_node*>* nodes = parser::parse(tokens);
+			ast_by_filename[file] = nodes;
 
 			indexer::index_ast_tree(nodes, dictionary);
 		} catch (tokenizer::tokenizer_exception& e) {
